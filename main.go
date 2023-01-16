@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"os"
@@ -21,13 +22,30 @@ var (
 func main() {
 	http.HandleFunc("/", forwardRequest)
 	go healthCheck()
-	err := http.ListenAndServe(":3000", nil)
+	fmt.Println("staring load balancer on " + GetLocalIP() + ":" + os.Getenv("PORT"))
+	err := http.ListenAndServe(":"+os.Getenv("PORT"), nil)
 	if errors.Is(err, http.ErrServerClosed) {
 		fmt.Printf("server closed\n")
 	} else if err != nil {
 		fmt.Printf("error starting server: %s\n", err)
 		os.Exit(1)
 	}
+}
+
+func GetLocalIP() string {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return ""
+	}
+	for _, address := range addrs {
+		// check the address type and if it is not a loopback the display it
+		if ipnet, ok := address.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+			if ipnet.IP.To4() != nil {
+				return ipnet.IP.String()
+			}
+		}
+	}
+	return ""
 }
 
 func forwardRequest(res http.ResponseWriter, req *http.Request) {
